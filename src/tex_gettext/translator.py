@@ -5,7 +5,6 @@ import os
 import re
 import subprocess
 import sys
-import unittest
 
 import icu  # type: ignore[import-untyped]
 
@@ -466,9 +465,3 @@ def convert_plurals(description, n, variants):
     s += variants[-1]
     s += ending
     return s
-
-
-if __name__ == "__main__":
-    import unittest
-
-    unittest.main()

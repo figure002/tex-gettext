@@ -1,6 +1,7 @@
 RUN = uv run
 RUFF = $(RUN) ruff
 MYPY = $(RUN) mypy
+PYTEST = $(RUN) pytest
 
 
 .PHONY: lint
@@ -13,3 +14,7 @@ lint:
 fix:
 	@$(RUFF) check --fix .
 	@$(RUFF) format .
+
+.PHONY: test
+test:
+	@$(PYTEST) -vs
