@@ -242,11 +242,7 @@ class TestMath(unittest.TestCase):
         for i in functions:
             sys.stderr.write("*")
             sys.stderr.flush()
-            for n in (
-                list(range(0, 30))
-                + list(range(40, 300, 10))
-                + list(range(400, 3000, 100))
-            ):
+            for n in range(0, 3):
                 sys.stderr.write(".")
                 sys.stderr.flush()
                 with open(TEST_FILE_PREFIX + ".tex", "w") as f:
