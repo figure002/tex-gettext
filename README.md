@@ -22,8 +22,21 @@ LaTeX part requires following packages: `intcalc`. To properly handle unicode
 characters, your document should use `fontspec` package, and you should also
 have XeTeX installed.
 
-Python part requires following packages: `icu`, `tz`, `tzlocal`
+Python part requires following packages: `pyicu`, `tz`, `tzlocal`
 
+Installation
+============
+
+We recommend using `uv` for the fastest and most reliable setup, but standard
+`pip` works too.
+
+```sh
+# 1. Install uv directly via pip
+pip install uv
+
+# 2. Run the script
+uv run tex-generate --input=the_document.tex
+```
 
 Quick how-to
 ============
