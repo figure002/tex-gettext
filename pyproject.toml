@@ -25,10 +25,7 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["E", "W", "F", "D", "I", "B", "UP", "RUF"]
-
-[tool.ruff.lint.pydocstyle]
-convention = "pep257"
+select = ["E", "W", "F", "I", "B", "UP", "RUF"]
 
 [tool.ruff.format]
 quote-style = "double"

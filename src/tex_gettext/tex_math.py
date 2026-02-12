@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import re
 import subprocess
 import sys
 import unittest
 
-COMMAND_PREFIX = 'gettextmath'
+COMMAND_PREFIX = "gettextmath"
+
 
 def generate_command_call(name, prefix, *args):
-    return '\\' + prefix + name + '{' + '}{'.join(args) + '}'
+    return "\\" + prefix + name + "{" + "}{".join(args) + "}"
+
 
 class Parser:
     class Token:
         function = False
+
         def process(self, stack, output):
             output.append(self)
 
@@ -34,7 +36,7 @@ class Parser:
             return isinstance(other, Parser.Number) and self.number == other.number
 
         def __str__(self):
-            return 'Number({})'.format(self.number)
+            return f"Number({self.number})"
 
     class Identifier(Token):
         def __init__(self, identifier):
@@ -44,10 +46,13 @@ class Parser:
             return self.identifier
 
         def __eq__(self, other):
-            return isinstance(other, Parser.Identifier) and self.identifier == other.identifier
+            return (
+                isinstance(other, Parser.Identifier)
+                and self.identifier == other.identifier
+            )
 
         def __str__(self):
-            return 'Identifier("{}")'.format(self.identifier)
+            return f'Identifier("{self.identifier}")'
 
     class Operator(Token):
         function = True
@@ -56,15 +61,15 @@ class Parser:
             self.operation = operation
 
         def process(self, stack, output):
-            while len(stack) > 0 and stack[len(stack)-1].priority < self.priority:
+            while len(stack) > 0 and stack[len(stack) - 1].priority < self.priority:
                 output.append(stack.pop())
             stack.append(self)
 
         def __eq__(self, other):
-            return type(self) == type(other) and self.operation == other.operation
+            return type(self) is type(other) and self.operation == other.operation
 
         def __str__(self):
-            return 'Operator("{}")'.format(self.operation)
+            return f'Operator("{self.operation}")'
 
     class BinaryOperator(Operator):
         def consume(self, stack):
@@ -73,60 +78,72 @@ class Parser:
             stack.append(self)
 
         def generate(self):
-            return generate_command_call(self.command, COMMAND_PREFIX, self.arg1.generate(), self.arg2.generate())
+            return generate_command_call(
+                self.command, COMMAND_PREFIX, self.arg1.generate(), self.arg2.generate()
+            )
 
     class OperatorEqual(BinaryOperator):
         priority = 7
-        command = 'equal'
+        command = "equal"
 
     class OperatorNotEqual(BinaryOperator):
         priority = 7
-        command = 'notequal'
+        command = "notequal"
 
     class OperatorGreaterEqual(BinaryOperator):
         priority = 6
-        command = 'greaterequal'
+        command = "greaterequal"
 
     class OperatorLesserEqual(BinaryOperator):
         priority = 6
-        command = 'lesserequal'
+        command = "lesserequal"
 
     class OperatorGreaterThan(BinaryOperator):
         priority = 6
-        command = 'greaterthan'
+        command = "greaterthan"
 
     class OperatorLesserThan(BinaryOperator):
         priority = 6
-        command = 'lesserthan'
+        command = "lesserthan"
 
     class OperatorAnd(BinaryOperator):
         priority = 11
-        command = 'and'
+        command = "and"
 
     class OperatorOr(BinaryOperator):
         priority = 12
-        command = 'or'
+        command = "or"
 
     class OperatorModulo(BinaryOperator):
         priority = 3
-        command = 'modulo'
+        command = "modulo"
 
     class OperatorTernaryStart(Operator):
         priority = 100
         function = False
+
         def consume(self, stack):
             self.arg_truefalse = stack.pop()
             self.arg_condition = stack.pop()
             if not isinstance(self.arg_truefalse, Parser.OperatorTernaryMiddle):
-                raise Exception('Operator "?" must have matching ":", but "{}" found'.format(self.arg_truefalse))
+                raise Exception(
+                    f'Operator "?" must have matching ":", but "{self.arg_truefalse}" found'  # noqa: E501
+                )
             stack.append(self)
 
         def generate(self):
-            return generate_command_call('ifthenelse', COMMAND_PREFIX, self.arg_condition.generate(), self.arg_truefalse.true.generate(), self.arg_truefalse.false.generate())
+            return generate_command_call(
+                "ifthenelse",
+                COMMAND_PREFIX,
+                self.arg_condition.generate(),
+                self.arg_truefalse.true.generate(),
+                self.arg_truefalse.false.generate(),
+            )
 
     class OperatorTernaryMiddle(Operator):
         priority = 100
         function = False
+
         def consume(self, stack):
             self.false = stack.pop()
             self.true = stack.pop()
@@ -134,53 +151,56 @@ class Parser:
 
     class OpenParenthesis(Token):
         priority = 100
+
         def process(self, stack, output):
             stack.append(self)
 
         def __str__(self):
-            return 'OpenParenthesis'
+            return "OpenParenthesis"
 
     class CloseParenthesis(Token):
         priority = 100
+
         def process(self, stack, output):
-            while len(stack) > 0 and not isinstance(stack[len(stack)-1], Parser.OpenParenthesis):
+            while len(stack) > 0 and not isinstance(
+                stack[len(stack) - 1], Parser.OpenParenthesis
+            ):
                 x = stack.pop()
                 output.append(x)
             open = stack.pop()
             if not isinstance(open, Parser.OpenParenthesis):
-                raise Exception('Could not find matching left parenthesis')
-            if len(stack) > 0 and stack[len(stack)-1].function:
+                raise Exception("Could not find matching left parenthesis")
+            if len(stack) > 0 and stack[len(stack) - 1].function:
                 output.append(stack.pop())
 
         def __str__(self):
-            return 'CloseParenthesis'
-
-    tokens = [
-        # boolean operations
-        (re.compile(r'^(==)'), OperatorEqual),
-        (re.compile(r'^(!=)'), OperatorNotEqual),
-        (re.compile(r'^(>=)'), OperatorGreaterEqual),
-        (re.compile(r'^(<=)'), OperatorLesserEqual),
-        (re.compile(r'^(>)'), OperatorGreaterThan),
-        (re.compile(r'^(<)'), OperatorLesserThan),
-        (re.compile(r'^(&&)'), OperatorAnd),
-        (re.compile(r'^(\|\|)'), OperatorOr),
-        (re.compile(r'^(\?)'), OperatorTernaryStart),
-        (re.compile(r'^(:)'), OperatorTernaryMiddle),
-        # arithmentic operations
-        (re.compile(r'^(%)'), OperatorModulo),
-        # parenthesis
-        (re.compile(r'^\('), OpenParenthesis),
-        (re.compile(r'^\)'), CloseParenthesis),
-        # others
-        (re.compile(r'^([0-9]+)'), Number),
-        (re.compile(r'^([_A-Za-z][_A-Za-z0-9]*)'), Identifier),
-        (re.compile(r'^\s+'), None),
-    ]
+            return "CloseParenthesis"
 
     def __init__(self, source):
         self.source = source
         self.overriden_identifiers = {}
+        self.tokens = [
+            # boolean operations
+            (re.compile(r"^(==)"), self.OperatorEqual),
+            (re.compile(r"^(!=)"), self.OperatorNotEqual),
+            (re.compile(r"^(>=)"), self.OperatorGreaterEqual),
+            (re.compile(r"^(<=)"), self.OperatorLesserEqual),
+            (re.compile(r"^(>)"), self.OperatorGreaterThan),
+            (re.compile(r"^(<)"), self.OperatorLesserThan),
+            (re.compile(r"^(&&)"), self.OperatorAnd),
+            (re.compile(r"^(\|\|)"), self.OperatorOr),
+            (re.compile(r"^(\?)"), self.OperatorTernaryStart),
+            (re.compile(r"^(:)"), self.OperatorTernaryMiddle),
+            # arithmentic operations
+            (re.compile(r"^(%)"), self.OperatorModulo),
+            # parenthesis
+            (re.compile(r"^\("), self.OpenParenthesis),
+            (re.compile(r"^\)"), self.CloseParenthesis),
+            # others
+            (re.compile(r"^([0-9]+)"), self.Number),
+            (re.compile(r"^([_A-Za-z][_A-Za-z0-9]*)"), self.Identifier),
+            (re.compile(r"^\s+"), None),
+        ]
 
     def override_identifier(self, old_identifier, new_identifier):
         self.overriden_identifiers[old_identifier] = new_identifier
@@ -195,9 +215,9 @@ class Parser:
                 if m:
                     break
             if not m:
-                raise Exception('No token matches "{}<...>"'.format(source[:10]))
+                raise Exception(f'No token matches "{source[:10]}<...>"')
 
-            source = source[len(m.group(0)):]
+            source = source[len(m.group(0)) :]
             token = i[1]
             if not token:
                 continue
@@ -209,11 +229,16 @@ class Parser:
         o = []
         for i in output:
             if isinstance(i, Parser.Identifier):
-                o.append(Parser.Identifier(self.overriden_identifiers.get(i.identifier, i.identifier)))
+                o.append(
+                    Parser.Identifier(
+                        self.overriden_identifiers.get(i.identifier, i.identifier)
+                    )
+                )
             else:
                 o.append(i)
         output = o
         return output
+
 
 class Generator:
     def __init__(self, queue):
@@ -224,224 +249,287 @@ class Generator:
         for i in self.queue:
             i.consume(stack)
         if len(stack) != 1:
-            raise Exception('RPN processing problem, stack size is not 1 ({})'.format(repr(stack)))
+            raise Exception(f"RPN processing problem, stack size is not 1 ({stack!r})")
         r = stack[0]
         r = r.generate()
         return r
 
+
 def generate_command(name, source, new_command=True):
-    s = '\\newcommand' if new_command else '\\renewcommand'
-    s += '{'+name+'}[1]{'
+    s = "\\newcommand" if new_command else "\\renewcommand"
+    s += "{" + name + "}[1]{"
     parser = Parser(source)
-    parser.override_identifier('n', '#1')
+    parser.override_identifier("n", "#1")
     s += Generator(parser.parse()).generate()
-    s += '}'
+    s += "}"
     return s
+
 
 class TestMath(unittest.TestCase):
     def test_parser(self):
-        exprs = [(
-            '0',
-            [Parser.Number(0),]
-        ),(
-            '1',
-            [Parser.Number(1),]
-        ),(
-            '01',
-            [Parser.Number(1),]
-        ),(
-            '0 1',
-            [Parser.Number(0), Parser.Number(1)]
-        ),(
-            '0 == 1',
-            [Parser.Number(0), Parser.Number(1), Parser.OperatorEqual('==')]
-        ),(
-            '0%2 == 1',
-            [
-                Parser.Number(0),
-                Parser.Number(2),
-                Parser.OperatorModulo('%'),
-                Parser.Number(1),
-                Parser.OperatorEqual('==')
-            ]
-        ),(
-            '0 == 1%2',
-            [
-                Parser.Number(0),
-                Parser.Number(1),
-                Parser.Number(2),
-                Parser.OperatorModulo('%'),
-                Parser.OperatorEqual('==')
-            ]
-        ),(
-            '0 ? 1 : 2',
-            [
-                Parser.Number(0),
-                Parser.Number(1),
-                Parser.Number(2),
-                Parser.OperatorTernaryMiddle(':'),
-                Parser.OperatorTernaryStart('?')
-            ]
-        ),(
-            '3 ? 4 : 5 ? 1 : 2',
-            [
-                Parser.Number(3),
-                Parser.Number(4),
-                Parser.Number(5),
-                Parser.Number(1),
-                Parser.Number(2),
-                Parser.OperatorTernaryMiddle(':'),
-                Parser.OperatorTernaryStart('?'),
-                Parser.OperatorTernaryMiddle(':'),
-                Parser.OperatorTernaryStart('?')
-            ]
-        ),(
-            '3%6 ? 4%7 : 5%8 ? 1%9 : 2%10',
-            [
-                Parser.Number(3),
-                Parser.Number(6),
-                Parser.OperatorModulo('%'),
-                Parser.Number(4),
-                Parser.Number(7),
-                Parser.OperatorModulo('%'),
-                Parser.Number(5),
-                Parser.Number(8),
-                Parser.OperatorModulo('%'),
-                Parser.Number(1),
-                Parser.Number(9),
-                Parser.OperatorModulo('%'),
-                Parser.Number(2),
-                Parser.Number(10),
-                Parser.OperatorModulo('%'),
-                Parser.OperatorTernaryMiddle(':'),
-                Parser.OperatorTernaryStart('?'),
-                Parser.OperatorTernaryMiddle(':'),
-                Parser.OperatorTernaryStart('?')
-            ]
-        ),(
-            'n?0:a?1:2',
-            [
-                Parser.Identifier('n'),
-                Parser.Number(0),
-                Parser.Identifier('a'),
-                Parser.Number(1),
-                Parser.Number(2),
-                Parser.OperatorTernaryMiddle(':'),
-                Parser.OperatorTernaryStart('?'),
-                Parser.OperatorTernaryMiddle(':'),
-                Parser.OperatorTernaryStart('?')
-            ]
-        ),(
-            'n?0:(a)?1:2',
-            [
-                Parser.Identifier('n'),
-                Parser.Number(0),
-                Parser.Identifier('a'),
-                Parser.Number(1),
-                Parser.Number(2),
-                Parser.OperatorTernaryMiddle(':'),
-                Parser.OperatorTernaryStart('?'),
-                Parser.OperatorTernaryMiddle(':'),
-                Parser.OperatorTernaryStart('?')
-            ]
-        ),(
-            'n==1 ? 0 : (a || b) ? 1 : 2',
-            [
-                Parser.Identifier('n'),
-                Parser.Number(1),
-                Parser.OperatorEqual('=='),
-                Parser.Number(0),
-                Parser.Identifier('a'),
-                Parser.Identifier('b'),
-                Parser.OperatorOr('||'),
-                Parser.Number(1),
-                Parser.Number(2),
-                Parser.OperatorTernaryMiddle(':'),
-                Parser.OperatorTernaryStart('?'),
-                Parser.OperatorTernaryMiddle(':'),
-                Parser.OperatorTernaryStart('?')
-            ]
-        )]
+        exprs = [
+            (
+                "0",
+                [
+                    Parser.Number(0),
+                ],
+            ),
+            (
+                "1",
+                [
+                    Parser.Number(1),
+                ],
+            ),
+            (
+                "01",
+                [
+                    Parser.Number(1),
+                ],
+            ),
+            ("0 1", [Parser.Number(0), Parser.Number(1)]),
+            (
+                "0 == 1",
+                [Parser.Number(0), Parser.Number(1), Parser.OperatorEqual("==")],
+            ),
+            (
+                "0%2 == 1",
+                [
+                    Parser.Number(0),
+                    Parser.Number(2),
+                    Parser.OperatorModulo("%"),
+                    Parser.Number(1),
+                    Parser.OperatorEqual("=="),
+                ],
+            ),
+            (
+                "0 == 1%2",
+                [
+                    Parser.Number(0),
+                    Parser.Number(1),
+                    Parser.Number(2),
+                    Parser.OperatorModulo("%"),
+                    Parser.OperatorEqual("=="),
+                ],
+            ),
+            (
+                "0 ? 1 : 2",
+                [
+                    Parser.Number(0),
+                    Parser.Number(1),
+                    Parser.Number(2),
+                    Parser.OperatorTernaryMiddle(":"),
+                    Parser.OperatorTernaryStart("?"),
+                ],
+            ),
+            (
+                "3 ? 4 : 5 ? 1 : 2",
+                [
+                    Parser.Number(3),
+                    Parser.Number(4),
+                    Parser.Number(5),
+                    Parser.Number(1),
+                    Parser.Number(2),
+                    Parser.OperatorTernaryMiddle(":"),
+                    Parser.OperatorTernaryStart("?"),
+                    Parser.OperatorTernaryMiddle(":"),
+                    Parser.OperatorTernaryStart("?"),
+                ],
+            ),
+            (
+                "3%6 ? 4%7 : 5%8 ? 1%9 : 2%10",
+                [
+                    Parser.Number(3),
+                    Parser.Number(6),
+                    Parser.OperatorModulo("%"),
+                    Parser.Number(4),
+                    Parser.Number(7),
+                    Parser.OperatorModulo("%"),
+                    Parser.Number(5),
+                    Parser.Number(8),
+                    Parser.OperatorModulo("%"),
+                    Parser.Number(1),
+                    Parser.Number(9),
+                    Parser.OperatorModulo("%"),
+                    Parser.Number(2),
+                    Parser.Number(10),
+                    Parser.OperatorModulo("%"),
+                    Parser.OperatorTernaryMiddle(":"),
+                    Parser.OperatorTernaryStart("?"),
+                    Parser.OperatorTernaryMiddle(":"),
+                    Parser.OperatorTernaryStart("?"),
+                ],
+            ),
+            (
+                "n?0:a?1:2",
+                [
+                    Parser.Identifier("n"),
+                    Parser.Number(0),
+                    Parser.Identifier("a"),
+                    Parser.Number(1),
+                    Parser.Number(2),
+                    Parser.OperatorTernaryMiddle(":"),
+                    Parser.OperatorTernaryStart("?"),
+                    Parser.OperatorTernaryMiddle(":"),
+                    Parser.OperatorTernaryStart("?"),
+                ],
+            ),
+            (
+                "n?0:(a)?1:2",
+                [
+                    Parser.Identifier("n"),
+                    Parser.Number(0),
+                    Parser.Identifier("a"),
+                    Parser.Number(1),
+                    Parser.Number(2),
+                    Parser.OperatorTernaryMiddle(":"),
+                    Parser.OperatorTernaryStart("?"),
+                    Parser.OperatorTernaryMiddle(":"),
+                    Parser.OperatorTernaryStart("?"),
+                ],
+            ),
+            (
+                "n==1 ? 0 : (a || b) ? 1 : 2",
+                [
+                    Parser.Identifier("n"),
+                    Parser.Number(1),
+                    Parser.OperatorEqual("=="),
+                    Parser.Number(0),
+                    Parser.Identifier("a"),
+                    Parser.Identifier("b"),
+                    Parser.OperatorOr("||"),
+                    Parser.Number(1),
+                    Parser.Number(2),
+                    Parser.OperatorTernaryMiddle(":"),
+                    Parser.OperatorTernaryStart("?"),
+                    Parser.OperatorTernaryMiddle(":"),
+                    Parser.OperatorTernaryStart("?"),
+                ],
+            ),
+        ]
 
         for i in exprs:
             parser = Parser(i[0])
-            self.assertEqual(i[1], parser.parse(), 'expression parsed incorrectly: "{}"'.format(i[0]))
+            self.assertEqual(
+                i[1], parser.parse(), f'expression parsed incorrectly: "{i[0]}"'
+            )
 
     def test_calculations(self):
-        functions = [(
-            '0',
-            lambda n: 0
-        ),(
-            'n != 1',
-            lambda n: int(n != 1)
-        ),(
-            'n>1',
-            lambda n: int(n > 1)
-        ),(
-            'n>1 ? 1 : 0',
-            lambda n: 1 if n > 1 else 0
-        ),(
-            'n==0 ? 10 : n==1 ? 11 : 12',
-            lambda n: 10 if n == 0 else (11 if n == 1 else 12)
-        ),(
-            'n%10==1 && n%100!=11 ? 0 : n != 0 ? 1 : 2',
-            lambda n: 0 if n%10 == 1 and n%100 != 11 else (1 if n != 0 else 2)
-        ),(
-            'n==1 ? 0 : n==2 ? 1 : 2',
-            lambda n: 0 if n == 1 else (1 if n == 2 else 2)
-        ),(
-            'n==1 ? 0 : (n==0 || (n%100 > 0 && n%100 < 20)) ? 1 : 2',
-            lambda n: 0 if n == 1 else (1 if (n == 0 or (n%100 > 0 and n%100 < 20)) else 2)
-        ),(
-            'n%10==1 && n%100!=11 ? 0 :  n%10>=2 && (n%100<10 || n%100>=20) ? 1 : 2',
-            lambda n: 0 if n%10 == 1 and n%100 != 11 else (1 if n%10>=2 and (n%100<10 or n%100>=20) else 2)
-        ),(
-            'n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2',
-            lambda n: 0 if n%10 == 1 and n%100 != 11 else (1 if n%10>=2 and n%10<=4 and (n%100<10 or n%100>=20) else 2)
-        ),(
-            '(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2',
-            lambda n: 0 if n == 1 else (1 if n >= 2 and n <= 4 else 2)
-        ),(
-            'n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2',
-            lambda n: 0 if n == 1 else (1 if n%10 >= 2 and n%10 <= 4 and (n%100 < 10 or n%100 >= 20) else 2)
-        ),(
-            'n%100==1 ? 0 : n%100==2 ? 1 : n%100==3 || n%100==4 ? 2 : 3',
-            lambda n: 0 if n%100 == 1 else (1 if n%100 == 2 else (2 if n%100 == 3 or n%100 == 4 else 3))
-        )]
+        functions = [
+            ("0", lambda n: 0),
+            ("n != 1", lambda n: int(n != 1)),
+            ("n>1", lambda n: int(n > 1)),
+            ("n>1 ? 1 : 0", lambda n: 1 if n > 1 else 0),
+            (
+                "n==0 ? 10 : n==1 ? 11 : 12",
+                lambda n: 10 if n == 0 else (11 if n == 1 else 12),
+            ),
+            (
+                "n%10==1 && n%100!=11 ? 0 : n != 0 ? 1 : 2",
+                lambda n: 0 if n % 10 == 1 and n % 100 != 11 else (1 if n != 0 else 2),
+            ),
+            (
+                "n==1 ? 0 : n==2 ? 1 : 2",
+                lambda n: 0 if n == 1 else (1 if n == 2 else 2),
+            ),
+            (
+                "n==1 ? 0 : (n==0 || (n%100 > 0 && n%100 < 20)) ? 1 : 2",
+                lambda n: (
+                    0
+                    if n == 1
+                    else (1 if (n == 0 or (n % 100 > 0 and n % 100 < 20)) else 2)
+                ),
+            ),
+            (
+                "n%10==1 && n%100!=11 ? 0 :  n%10>=2 && (n%100<10 || n%100>=20) ? 1 : 2",  # noqa: E501
+                lambda n: (
+                    0
+                    if n % 10 == 1 and n % 100 != 11
+                    else (1 if n % 10 >= 2 and (n % 100 < 10 or n % 100 >= 20) else 2)
+                ),
+            ),
+            (
+                "n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2",  # noqa: E501
+                lambda n: (
+                    0
+                    if n % 10 == 1 and n % 100 != 11
+                    else (
+                        1
+                        if n % 10 >= 2
+                        and n % 10 <= 4
+                        and (n % 100 < 10 or n % 100 >= 20)
+                        else 2
+                    )
+                ),
+            ),
+            (
+                "(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2",
+                lambda n: 0 if n == 1 else (1 if n >= 2 and n <= 4 else 2),
+            ),
+            (
+                "n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2",
+                lambda n: (
+                    0
+                    if n == 1
+                    else (
+                        1
+                        if n % 10 >= 2
+                        and n % 10 <= 4
+                        and (n % 100 < 10 or n % 100 >= 20)
+                        else 2
+                    )
+                ),
+            ),
+            (
+                "n%100==1 ? 0 : n%100==2 ? 1 : n%100==3 || n%100==4 ? 2 : 3",
+                lambda n: (
+                    0
+                    if n % 100 == 1
+                    else (
+                        1
+                        if n % 100 == 2
+                        else (2 if n % 100 == 3 or n % 100 == 4 else 3)
+                    )
+                ),
+            ),
+        ]
 
-        re_text = re.compile(r'<text(.*?)>(.*?)</text>', re.DOTALL)
-        re_tspan = re.compile(r'</?tspan(.*?)>', re.DOTALL)
+        re_text = re.compile(r"<text(.*?)>(.*?)</text>", re.DOTALL)
+        re_tspan = re.compile(r"</?tspan(.*?)>", re.DOTALL)
 
-        TEST_FILE_PREFIX = '_test'
+        TEST_FILE_PREFIX = "_test"
 
         for i in functions:
-            sys.stderr.write('*')
+            sys.stderr.write("*")
             sys.stderr.flush()
-            for n in list(range(0,30))+list(range(40,300,10))+list(range(400,3000,100)):
-                sys.stderr.write('.')
+            for n in (
+                list(range(0, 30))
+                + list(range(40, 300, 10))
+                + list(range(400, 3000, 100))
+            ):
+                sys.stderr.write(".")
                 sys.stderr.flush()
-                with open(TEST_FILE_PREFIX+'.tex', 'w') as f:
-                    f.write('\\documentclass{article}\n')
-                    f.write('\\usepackage{tipa}\n')
-                    f.write('\\usepackage{gettext}\n')
-                    f.write(generate_command('\\testfn', i[0]))
-                    f.write('\n')
-                    f.write('\\begin{document}\n')
-                    f.write('\\testfn{''')
+                with open(TEST_FILE_PREFIX + ".tex", "w") as f:
+                    f.write("\\documentclass{article}\n")
+                    f.write("\\usepackage{tipa}\n")
+                    f.write("\\usepackage{gettext}\n")
+                    f.write(generate_command("\\testfn", i[0]))
+                    f.write("\n")
+                    f.write("\\begin{document}\n")
+                    f.write("\\testfn{")
                     f.write(str(n))
-                    f.write('}\n')
-                    f.write('\\end{document}')
+                    f.write("}\n")
+                    f.write("\\end{document}")
                 kwargs = dict(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                subprocess.check_call(['latex', TEST_FILE_PREFIX+'.tex'], **kwargs)
-                subprocess.check_call(['dvisvgm', TEST_FILE_PREFIX+'.dvi'], **kwargs)
-                with open(TEST_FILE_PREFIX+'.svg') as f:
+                subprocess.check_call(["latex", TEST_FILE_PREFIX + ".tex"], **kwargs)
+                subprocess.check_call(["dvisvgm", TEST_FILE_PREFIX + ".dvi"], **kwargs)
+                with open(TEST_FILE_PREFIX + ".svg") as f:
                     f = f.read()
-                    f = f.replace('\n', '')
+                    f = f.replace("\n", "")
                     f = re_text.findall(f)
-                    f = [ re_tspan.sub(' ', i[1]) for i in f ]
-                    f = ''.join(f)
+                    f = [re_tspan.sub(" ", i[1]) for i in f]
+                    f = "".join(f)
                     f = f.strip()
-                    if f.endswith('1'): #strip page number
+                    if f.endswith("1"):  # strip page number
                         f = f[:-1]
                     f = f.strip()
                     f = int(f)
@@ -450,6 +538,8 @@ class TestMath(unittest.TestCase):
                 actual = f
                 self.assertEqual(expected, actual)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     import unittest
+
     unittest.main()
