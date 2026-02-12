@@ -7,7 +7,7 @@ import subprocess
 import sys
 import unittest
 
-import icu
+import icu  # type: ignore[import-untyped]
 
 from . import tex_math
 
