@@ -3,14 +3,10 @@
 
 import argparse
 import logging
-import os
-import os.path
-import re
-import sqlite3
 import subprocess
 import sys
-import time
-import translator
+
+from . import translator
 
 VERSION='0.1'
 
@@ -48,4 +44,3 @@ def main():
 
 if __name__ == '__main__':
 	main()
-

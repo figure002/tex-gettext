@@ -421,7 +421,7 @@ class TestMath(unittest.TestCase):
                 sys.stderr.write('.')
                 sys.stderr.flush()
                 with open(TEST_FILE_PREFIX+'.tex', 'w') as f:
-                    f.write('\documentclass{article}\n')
+                    f.write('\\documentclass{article}\n')
                     f.write('\\usepackage{tipa}\n')
                     f.write('\\usepackage{gettext}\n')
                     f.write(generate_command('\\testfn', i[0]))

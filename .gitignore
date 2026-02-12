@@ -1,6 +1,7 @@
 __pycache__
 examples/*.aux
 examples/*.log
-examples/sample_doc.*.tex
 examples/*.pdf
 examples/*.pot
+examples/sample_doc.*.tex
+src/tex_gettext.egg-info/

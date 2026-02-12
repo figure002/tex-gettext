@@ -2,16 +2,15 @@
 # -*- coding: utf-8 -*-
 
 import datetime
-import icu
-import locale
 import os
 import re
-import shutil
 import subprocess
 import sys
-import tex_math
-import tzlocal
 import unittest
+
+import icu
+
+from . import tex_math
 
 RE_PO_FILE = re.compile(r'.*\.(.*)\.po$')
 DEFAULT_PLURAL = 'nplurals=2; plural=n != 1'
@@ -105,7 +104,7 @@ class Document:
 						raise Exception(
 							'Could not find end for tag that starts at line '+
 							'{line} ({text})'.format(
-								line=line_number[start], 
+								line=line_number[start],
 								text=(
 									doc[max(start-20, 0):start]+' --> '+
 									doc[start:min(start+20, len(doc))])
@@ -397,7 +396,6 @@ def convert_plurals(description, n, variants):
 	s += variants[-1]
 	s += ending
 	return s
-	return 'convert\_plurals('+description+','+msgid1+','+msgid2+','+n+')'
 
 if __name__ == '__main__':
 	import unittest
